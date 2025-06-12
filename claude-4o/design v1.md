@@ -396,4 +396,316 @@ CREATE TABLE sales_transactions (
     discount_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
     total_amount DECIMAL(15, 2) NOT NULL,
     payment_status VARCHAR(20) NOT NULL CHECK (payment_status IN ('pending', 'partial', 'paid', 'refunded')),
-    notes
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, transaction_number)
+);
+
+-- Sales Transaction Items
+CREATE TABLE sales_transaction_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sales_transaction_id UUID NOT NULL REFERENCES sales_transactions(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    product_variant_id UUID REFERENCES product_variants(id),
+    quantity DECIMAL(15, 4) NOT NULL,
+    unit_price DECIMAL(15, 4) NOT NULL,
+    discount_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    tax_rate DECIMAL(5, 2) NOT NULL,
+    tax_amount DECIMAL(15, 2) NOT NULL,
+    line_total DECIMAL(15, 2) NOT NULL,
+    cost_price DECIMAL(15, 4) NOT NULL, -- For profit calculation
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Payment Methods
+CREATE TABLE payment_methods (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('cash', 'credit_card', 'debit_card', 'ewallet', 'bank_transfer', 'other')),
+    is_active BOOLEAN DEFAULT true,
+    processing_fee_percentage DECIMAL(5, 2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, code)
+);
+
+-- Payments
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sales_transaction_id UUID NOT NULL REFERENCES sales_transactions(id),
+    payment_method_id UUID NOT NULL REFERENCES payment_methods(id),
+    amount DECIMAL(15, 2) NOT NULL,
+    reference_number VARCHAR(100),
+    payment_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Purchase Orders
+CREATE TABLE purchase_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    outlet_id UUID NOT NULL REFERENCES outlets(id),
+    supplier_id UUID NOT NULL REFERENCES suppliers(id),
+    po_number VARCHAR(50) NOT NULL,
+    order_date DATE NOT NULL,
+    expected_delivery_date DATE,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'sent', 'partial', 'received', 'cancelled')),
+    subtotal DECIMAL(15, 2) NOT NULL,
+    tax_amount DECIMAL(15, 2) NOT NULL,
+    total_amount DECIMAL(15, 2) NOT NULL,
+    notes TEXT,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, po_number)
+);
+
+-- Purchase Order Items
+CREATE TABLE purchase_order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    product_variant_id UUID REFERENCES product_variants(id),
+    quantity_ordered DECIMAL(15, 4) NOT NULL,
+    quantity_received DECIMAL(15, 4) NOT NULL DEFAULT 0,
+    unit_cost DECIMAL(15, 4) NOT NULL,
+    tax_rate DECIMAL(5, 2) NOT NULL,
+    tax_amount DECIMAL(15, 2) NOT NULL,
+    line_total DECIMAL(15, 2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Stock Movements
+CREATE TABLE stock_movements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    outlet_id UUID NOT NULL REFERENCES outlets(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    product_variant_id UUID REFERENCES product_variants(id),
+    movement_type VARCHAR(50) NOT NULL CHECK (movement_type IN ('sale', 'purchase', 'adjustment', 'transfer_in', 'transfer_out', 'return', 'damage')),
+    reference_type VARCHAR(50), -- sales_transaction, purchase_order, stock_adjustment, etc.
+    reference_id UUID,
+    quantity DECIMAL(15, 4) NOT NULL, -- Positive for in, negative for out
+    unit_cost DECIMAL(15, 4),
+    movement_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    created_by UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- GST Settings
+CREATE TABLE gst_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    effective_date DATE NOT NULL,
+    standard_rate DECIMAL(5, 2) NOT NULL,
+    is_inclusive BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, effective_date)
+);
+
+-- Accounting Integration
+CREATE TABLE chart_of_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    account_code VARCHAR(50) NOT NULL,
+    account_name VARCHAR(255) NOT NULL,
+    account_type VARCHAR(50) NOT NULL CHECK (account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
+    parent_id UUID REFERENCES chart_of_accounts(id),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, account_code)
+);
+
+-- Journal Entries
+CREATE TABLE journal_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    entry_number VARCHAR(50) NOT NULL,
+    entry_date DATE NOT NULL,
+    description TEXT NOT NULL,
+    reference_type VARCHAR(50),
+    reference_id UUID,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('draft', 'posted', 'void')),
+    created_by UUID NOT NULL REFERENCES users(id),
+    posted_by UUID REFERENCES users(id),
+    posted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, entry_number)
+);
+
+-- Journal Entry Lines
+CREATE TABLE journal_entry_lines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    journal_entry_id UUID NOT NULL REFERENCES journal_entries(id),
+    account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
+    debit_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    credit_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK ((debit_amount = 0 AND credit_amount > 0) OR (debit_amount > 0 AND credit_amount = 0))
+);
+
+-- Audit Trail
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL REFERENCES companies(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    action VARCHAR(50) NOT NULL,
+    table_name VARCHAR(100) NOT NULL,
+    record_id UUID NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for Performance
+CREATE INDEX idx_sales_transactions_date ON sales_transactions(transaction_date);
+CREATE INDEX idx_sales_transactions_customer ON sales_transactions(customer_id);
+CREATE INDEX idx_sales_transaction_items_product ON sales_transaction_items(product_id);
+CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_stock_movements_date ON stock_movements(movement_date);
+CREATE INDEX idx_stock_movements_product ON stock_movements(product_id);
+CREATE INDEX idx_audit_logs_date ON audit_logs(created_at);
+CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+
+-- Triggers for Updated Timestamps
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Add similar triggers for all tables with updated_at column
+```
+
+### 5.2 Database Design Principles
+
+The database schema follows these key principles:
+
+1. **UUID Primary Keys**: All tables use UUIDs for primary keys to support distributed systems and avoid ID conflicts.
+
+2. **Multi-tenancy**: The `company_id` field enables multi-tenant support, allowing multiple businesses to use the same installation.
+
+3. **Audit Trail**: Comprehensive audit logging tracks all changes for compliance and debugging.
+
+4. **Referential Integrity**: Foreign key constraints ensure data consistency across related tables.
+
+5. **Performance Optimization**: Strategic indexes on frequently queried columns and date fields.
+
+6. **Flexible Attributes**: JSONB fields for storing variable attributes without schema changes.
+
+## 6. Codebase File Hierarchy
+
+```
+sg-pos-system/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                          # Application entry point
+│   ├── config.py                        # Configuration management
+│   ├── constants.py                     # Application constants
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── application_core.py          # Dependency injection container
+│   │   ├── exceptions.py                # Custom exception classes
+│   │   ├── result.py                    # Result pattern implementation
+│   │   └── decorators.py                # Common decorators
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── base.py                      # SQLAlchemy base model
+│   │   ├── company.py                   # Company model
+│   │   ├── user.py                      # User and authentication models
+│   │   ├── product.py                   # Product and category models
+│   │   ├── inventory.py                 # Inventory models
+│   │   ├── customer.py                  # Customer model
+│   │   ├── supplier.py                  # Supplier model
+│   │   ├── sales.py                     # Sales transaction models
+│   │   ├── purchase.py                  # Purchase order models
+│   │   ├── payment.py                   # Payment models
+│   │   ├── accounting.py                # Accounting models
+│   │   └── audit.py                     # Audit log model
+│   ├── dto/
+│   │   ├── __init__.py
+│   │   ├── base.py                      # Base DTO classes
+│   │   ├── product_dto.py               # Product DTOs
+│   │   ├── sales_dto.py                 # Sales DTOs
+│   │   ├── customer_dto.py              # Customer DTOs
+│   │   ├── inventory_dto.py             # Inventory DTOs
+│   │   ├── payment_dto.py               # Payment DTOs
+│   │   └── report_dto.py                # Reporting DTOs
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── base_service.py              # Base repository service
+│   │   ├── company_service.py           # Company data access
+│   │   ├── user_service.py              # User data access
+│   │   ├── product_service.py           # Product data access
+│   │   ├── inventory_service.py         # Inventory data access
+│   │   ├── customer_service.py          # Customer data access
+│   │   ├── sales_service.py             # Sales data access
+│   │   ├── payment_service.py           # Payment data access
+│   │   ├── accounting_service.py        # Accounting data access
+│   │   └── audit_service.py             # Audit logging service
+│   ├── business_logic/
+│   │   ├── __init__.py
+│   │   ├── auth_manager.py              # Authentication logic
+│   │   ├── sales_manager.py             # Sales workflow orchestration
+│   │   ├── inventory_manager.py         # Inventory management logic
+│   │   ├── customer_manager.py          # Customer management logic
+│   │   ├── product_manager.py           # Product management logic
+│   │   ├── payment_manager.py           # Payment processing logic
+│   │   ├── purchase_manager.py          # Purchase order logic
+│   │   ├── report_manager.py            # Report generation logic
+│   │   └── gst_manager.py               # GST calculation logic
+│   ├── accounting/
+│   │   ├── __init__.py
+│   │   ├── journal_manager.py           # Journal entry management
+│   │   ├── ledger_manager.py            # General ledger logic
+│   │   ├── trial_balance.py            # Trial balance generation
+│   │   └── financial_reports.py        # Financial statement generation
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   ├── main_window.py               # Main application window
+│   │   ├── styles/
+│   │   │   ├── __init__.py
+│   │   │   ├── theme.py                 # Application theme
+│   │   │   └── stylesheets.py           # Qt stylesheets
+│   │   ├── widgets/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_widget.py           # Base widget class
+│   │   │   ├── dashboard_widget.py      # Dashboard view
+│   │   │   ├── sales_widget.py          # POS sales interface
+│   │   │   ├── inventory_widget.py      # Inventory management
+│   │   │   ├── customer_widget.py       # Customer management
+│   │   │   ├── product_widget.py        # Product management
+│   │   │   ├── reports_widget.py        # Reports interface
+│   │   │   └── settings_widget.py       # Settings interface
+│   │   ├── dialogs/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_dialog.py           # Base dialog class
+│   │   │   ├── login_dialog.py          # Login dialog
+│   │   │   ├── payment_dialog.py        # Payment processing dialog
+│   │   │   ├── customer_dialog.py       # Customer creation/edit
+│   │   │   ├── product_dialog.py        # Product creation/edit
+│   │   │   └── report_dialog.py         # Report parameters dialog
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_model.py            # Base Qt model class
+│   │   │   ├── product_model.py         # Product table model
+│   │   │   ├──
