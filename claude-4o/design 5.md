@@ -1262,3 +1262,415 @@ class SalesManager:
         except Exception as e:
             self._app_core.logger.error(f"Failed to create transaction: {e}")
             return Result(success
+<think>
+I need to continue from where I left off in the Sales Manager code example and complete the rest of the PRD including all remaining sections.
+</think>
+
+```python
+            return Result(success=False, error=str(e))
+    
+    async def add_item(self, transaction_id: str, product_id: int, 
+                      quantity: int) -> Result[SalesItemDTO]:
+        """Add item to transaction."""
+        try:
+            # Validate transaction exists
+            if transaction_id not in self._active_transactions:
+                return Result(success=False, error="Transaction not found")
+            
+            transaction = self._active_transactions[transaction_id]
+            
+            # Check inventory availability
+            availability = await self._app_core.inventory_manager.check_availability(
+                product_id, quantity, transaction.location_id
+            )
+            
+            if not availability.success:
+                return Result(success=False, error=availability.error)
+            
+            # Get product details
+            product = await self._app_core.product_service.get_by_id(product_id)
+            
+            # Calculate pricing
+            unit_price = product.selling_price
+            discount = await self._calculate_discount(product_id, quantity)
+            tax = await self._app_core.gst_manager.calculate_tax(
+                unit_price * quantity - discount
+            )
+            
+            # Create sales item
+            item = SalesItem(
+                product_id=product_id,
+                quantity=quantity,
+                unit_price=unit_price,
+                discount_amount=discount,
+                tax_amount=tax,
+                total_amount=(unit_price * quantity) - discount + tax
+            )
+            
+            # Add to transaction
+            transaction.items.append(item)
+            
+            # Update transaction totals
+            self._update_transaction_totals(transaction)
+            
+            return Result(success=True, data=self._item_to_dto(item))
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Failed to add item: {e}")
+            return Result(success=False, error=str(e))
+    
+    async def process_payment(self, transaction_id: str, 
+                            payments: List[PaymentDTO]) -> Result[TransactionDTO]:
+        """Process payment for transaction."""
+        try:
+            transaction = self._active_transactions.get(transaction_id)
+            if not transaction:
+                return Result(success=False, error="Transaction not found")
+            
+            # Validate payment amount
+            total_payment = sum(p.amount for p in payments)
+            if total_payment < transaction.total_amount:
+                return Result(success=False, error="Insufficient payment")
+            
+            # Process each payment
+            payment_results = []
+            for payment in payments:
+                result = await self._app_core.payment_manager.process_payment(
+                    transaction_id, payment
+                )
+                if not result.success:
+                    # Rollback previous payments
+                    await self._rollback_payments(payment_results)
+                    return Result(success=False, error=result.error)
+                payment_results.append(result.data)
+            
+            # Update inventory
+            for item in transaction.items:
+                await self._app_core.inventory_manager.deduct_stock(
+                    item.product_id, item.quantity, transaction.location_id
+                )
+            
+            # Update customer loyalty points
+            if transaction.customer_id:
+                points = int(transaction.total_amount)
+                await self._app_core.loyalty_manager.add_points(
+                    transaction.customer_id, points, transaction_id
+                )
+            
+            # Save transaction to database
+            saved = await self._app_core.sales_service.create_transaction(transaction)
+            
+            # Generate journal entries
+            await self._app_core.journal_manager.create_sales_entry(saved.data)
+            
+            # Remove from active transactions
+            del self._active_transactions[transaction_id]
+            
+            return Result(success=True, data=saved.data)
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Payment processing failed: {e}")
+            return Result(success=False, error=str(e))
+```
+
+### 3. Inventory Manager (`app/business_logic/inventory_manager.py`)
+
+The InventoryManager handles all inventory-related operations including stock tracking, transfers, and adjustments.
+
+```python
+class InventoryManager:
+    """Manages inventory operations and stock levels."""
+    
+    def __init__(self, app_core: ApplicationCore):
+        self._app_core = app_core
+        self._stock_cache = TTLCache(maxsize=1000, ttl=300)  # 5-minute cache
+        
+    async def check_availability(self, product_id: int, quantity: int, 
+                               location_id: int) -> Result[bool]:
+        """Check if sufficient stock is available."""
+        try:
+            # Check cache first
+            cache_key = f"{product_id}:{location_id}"
+            if cache_key in self._stock_cache:
+                current_stock = self._stock_cache[cache_key]
+            else:
+                # Query database
+                inventory = await self._app_core.inventory_service.get_stock_level(
+                    product_id, location_id
+                )
+                current_stock = inventory.quantity - inventory.reserved_quantity
+                self._stock_cache[cache_key] = current_stock
+            
+            available = current_stock >= quantity
+            return Result(success=True, data=available)
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Availability check failed: {e}")
+            return Result(success=False, error=str(e))
+    
+    async def transfer_stock(self, product_id: int, from_location: int,
+                           to_location: int, quantity: int, 
+                           user_id: int) -> Result[StockTransferDTO]:
+        """Transfer stock between locations."""
+        try:
+            # Validate source stock
+            availability = await self.check_availability(
+                product_id, quantity, from_location
+            )
+            if not availability.data:
+                return Result(success=False, error="Insufficient stock at source")
+            
+            # Create transfer record
+            transfer = StockTransfer(
+                product_id=product_id,
+                from_location_id=from_location,
+                to_location_id=to_location,
+                quantity=quantity,
+                user_id=user_id,
+                status=TransferStatus.PENDING
+            )
+            
+            # Begin transaction
+            async with self._app_core.db_session() as session:
+                # Deduct from source
+                await self._app_core.inventory_service.adjust_stock(
+                    product_id, from_location, -quantity, 
+                    "TRANSFER_OUT", transfer.id, session
+                )
+                
+                # Add to destination
+                await self._app_core.inventory_service.adjust_stock(
+                    product_id, to_location, quantity,
+                    "TRANSFER_IN", transfer.id, session
+                )
+                
+                # Save transfer record
+                transfer.status = TransferStatus.COMPLETED
+                session.add(transfer)
+                await session.commit()
+            
+            # Clear cache
+            self._clear_stock_cache(product_id, [from_location, to_location])
+            
+            return Result(success=True, data=self._to_transfer_dto(transfer))
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Stock transfer failed: {e}")
+            return Result(success=False, error=str(e))
+    
+    async def perform_stock_take(self, location_id: int, 
+                               counts: List[StockCountDTO],
+                               user_id: int) -> Result[StockTakeDTO]:
+        """Perform stock take and create adjustments."""
+        try:
+            adjustments = []
+            
+            async with self._app_core.db_session() as session:
+                for count in counts:
+                    # Get current stock
+                    current = await self._app_core.inventory_service.get_stock_level(
+                        count.product_id, location_id, session
+                    )
+                    
+                    difference = count.counted_quantity - current.quantity
+                    
+                    if difference != 0:
+                        # Create adjustment
+                        adjustment = await self._app_core.inventory_service.adjust_stock(
+                            count.product_id, location_id, difference,
+                            "STOCK_TAKE", None, session
+                        )
+                        adjustments.append(adjustment)
+                
+                # Create stock take record
+                stock_take = StockTake(
+                    location_id=location_id,
+                    user_id=user_id,
+                    adjustments=adjustments,
+                    status=StockTakeStatus.COMPLETED
+                )
+                
+                session.add(stock_take)
+                await session.commit()
+            
+            # Clear cache for location
+            self._clear_location_cache(location_id)
+            
+            return Result(success=True, data=self._to_stock_take_dto(stock_take))
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Stock take failed: {e}")
+            return Result(success=False, error=str(e))
+```
+
+### 4. Payment Manager (`app/business_logic/payment_manager.py`)
+
+The PaymentManager handles all payment processing including integration with various payment gateways.
+
+```python
+class PaymentManager:
+    """Manages payment processing and gateway integrations."""
+    
+    def __init__(self, app_core: ApplicationCore):
+        self._app_core = app_core
+        self._gateways = self._initialize_gateways()
+        
+    def _initialize_gateways(self) -> Dict[str, PaymentGateway]:
+        """Initialize payment gateway integrations."""
+        return {
+            PaymentMethod.CREDIT_CARD: StripeGateway(self._app_core.config),
+            PaymentMethod.DEBIT_CARD: StripeGateway(self._app_core.config),
+            PaymentMethod.NETS: NETSGateway(self._app_core.config),
+            PaymentMethod.PAYNOW: PayNowGateway(self._app_core.config),
+        }
+    
+    async def process_payment(self, transaction_id: str,
+                            payment: PaymentDTO) -> Result[PaymentResultDTO]:
+        """Process a payment through appropriate gateway."""
+        try:
+            # Handle cash payments directly
+            if payment.method == PaymentMethod.CASH:
+                return await self._process_cash_payment(transaction_id, payment)
+            
+            # Get appropriate gateway
+            gateway = self._gateways.get(payment.method)
+            if not gateway:
+                return Result(success=False, error="Unsupported payment method")
+            
+            # Process through gateway
+            gateway_result = await gateway.process_payment(
+                amount=payment.amount,
+                currency=payment.currency,
+                reference=transaction_id,
+                metadata=payment.metadata
+            )
+            
+            if not gateway_result.success:
+                return Result(success=False, error=gateway_result.error)
+            
+            # Save payment record
+            payment_record = Payment(
+                transaction_id=transaction_id,
+                method=payment.method,
+                amount=payment.amount,
+                currency=payment.currency,
+                reference_number=gateway_result.data.reference_number,
+                status=PaymentStatus.COMPLETED,
+                gateway_response=gateway_result.data.raw_response
+            )
+            
+            saved = await self._app_core.payment_service.create_payment(payment_record)
+            
+            # Create journal entry
+            await self._create_payment_journal_entry(payment_record)
+            
+            return Result(success=True, data=self._to_payment_result_dto(saved.data))
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Payment processing failed: {e}")
+            return Result(success=False, error=str(e))
+    
+    async def process_refund(self, payment_id: int, amount: Decimal,
+                           reason: str) -> Result[RefundDTO]:
+        """Process a refund for a previous payment."""
+        try:
+            # Get original payment
+            payment = await self._app_core.payment_service.get_by_id(payment_id)
+            if not payment:
+                return Result(success=False, error="Payment not found")
+            
+            # Validate refund amount
+            if amount > payment.amount:
+                return Result(success=False, error="Refund exceeds original payment")
+            
+            # Process refund through gateway
+            if payment.method != PaymentMethod.CASH:
+                gateway = self._gateways.get(payment.method)
+                refund_result = await gateway.process_refund(
+                    payment.reference_number, amount
+                )
+                
+                if not refund_result.success:
+                    return Result(success=False, error=refund_result.error)
+            
+            # Create refund record
+            refund = Refund(
+                payment_id=payment_id,
+                amount=amount,
+                reason=reason,
+                status=RefundStatus.COMPLETED,
+                reference_number=refund_result.data.reference_number
+                    if payment.method != PaymentMethod.CASH else None
+            )
+            
+            saved = await self._app_core.payment_service.create_refund(refund)
+            
+            # Create journal entry
+            await self._create_refund_journal_entry(refund)
+            
+            return Result(success=True, data=self._to_refund_dto(saved.data))
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Refund processing failed: {e}")
+            return Result(success=False, error=str(e))
+```
+
+### 5. GST Manager (`app/accounting/gst_manager.py`)
+
+The GSTManager handles all GST-related calculations and reporting for Singapore compliance.
+
+```python
+class GSTManager:
+    """Manages GST calculations and compliance reporting."""
+    
+    def __init__(self, app_core: ApplicationCore):
+        self._app_core = app_core
+        self._gst_config = None
+        self._load_gst_config()
+        
+    async def _load_gst_config(self):
+        """Load current GST configuration."""
+        config = await self._app_core.configuration_service.get_gst_config()
+        self._gst_config = config.data
+    
+    def calculate_tax(self, amount: Decimal, tax_type: str = "STANDARD") -> Decimal:
+        """Calculate GST for given amount."""
+        if tax_type == "ZERO_RATED" or tax_type == "EXEMPT":
+            return Decimal("0.00")
+        
+        rate = self._gst_config.standard_rate / 100
+        return round(amount * rate / (1 + rate), 2)  # Tax-inclusive calculation
+    
+    async def generate_gst_return(self, start_date: date, 
+                                end_date: date) -> Result[GSTReturnDTO]:
+        """Generate GST return for specified period."""
+        try:
+            # Get all transactions for period
+            sales = await self._app_core.sales_service.get_by_date_range(
+                start_date, end_date
+            )
+            
+            purchases = await self._app_core.purchase_service.get_by_date_range(
+                start_date, end_date
+            )
+            
+            # Calculate boxes
+            box1 = Decimal("0.00")  # Total value of standard-rated supplies
+            box2 = Decimal("0.00")  # Total value of purchases
+            box3 = Decimal("0.00")  # Output tax due
+            box4 = Decimal("0.00")  # Input tax claimable
+            box6 = Decimal("0.00")  # Total value of exports
+            box7 = Decimal("0.00")  # Total value of exempt supplies
+            
+            # Process sales
+            for sale in sales.data:
+                if sale.tax_type == "STANDARD":
+                    box1 += sale.subtotal
+                    box3 += sale.tax_amount
+                elif sale.tax_type == "ZERO_RATED":
+                    box6 += sale.subtotal
+                elif sale.tax_type == "EXEMPT":
+                    box7 += sale.subtotal
+            
+            # Process purchases
+            for purchase
