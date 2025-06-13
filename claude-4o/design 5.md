@@ -853,3 +853,412 @@ sg-pos-system/
 │   │   ├── __init__.py
 │   │   ├── main_window.py               # Main application window
 │   │
+<think>
+The user is right, I didn't complete the PRD. I need to continue from where I left off in the codebase file hierarchy and complete all the remaining sections according to the table of contents I provided. Let me continue from the UI section of the file hierarchy.
+</think>
+
+```
+│   │   ├── ui/                              # Presentation layer (continued)
+│   │   ├── __init__.py
+│   │   ├── main_window.py               # Main application window
+│   │   ├── styles.py                    # Application styling
+│   │   ├── base_widget.py               # Base widget class
+│   │   │
+│   │   ├── pos/                         # Point of Sale UI
+│   │   │   ├── __init__.py
+│   │   │   ├── pos_widget.py            # Main POS interface
+│   │   │   ├── product_grid.py          # Product selection grid
+│   │   │   ├── cart_widget.py           # Shopping cart display
+│   │   │   ├── payment_dialog.py        # Payment processing dialog
+│   │   │   ├── customer_display.py      # Customer-facing display
+│   │   │   └── receipt_preview.py       # Receipt preview/print
+│   │   │
+│   │   ├── inventory/                   # Inventory management UI
+│   │   │   ├── __init__.py
+│   │   │   ├── inventory_widget.py      # Main inventory interface
+│   │   │   ├── product_editor.py        # Product add/edit dialog
+│   │   │   ├── stock_adjustment.py      # Stock adjustment dialog
+│   │   │   ├── stock_transfer.py        # Inter-location transfer
+│   │   │   └── barcode_scanner.py       # Barcode scanning interface
+│   │   │
+│   │   ├── customers/                   # Customer management UI
+│   │   │   ├── __init__.py
+│   │   │   ├── customer_widget.py       # Customer list/search
+│   │   │   ├── customer_editor.py       # Customer add/edit dialog
+│   │   │   ├── loyalty_widget.py        # Loyalty program interface
+│   │   │   └── customer_history.py      # Purchase history view
+│   │   │
+│   │   ├── reports/                     # Reporting UI
+│   │   │   ├── __init__.py
+│   │   │   ├── reports_widget.py        # Main reports interface
+│   │   │   ├── sales_reports.py         # Sales report views
+│   │   │   ├── inventory_reports.py     # Inventory reports
+│   │   │   ├── financial_reports.py     # Financial statements
+│   │   │   ├── gst_reports.py           # GST reporting
+│   │   │   └── chart_widgets.py         # Data visualization
+│   │   │
+│   │   ├── settings/                    # Settings UI
+│   │   │   ├── __init__.py
+│   │   │   ├── settings_widget.py       # Main settings interface
+│   │   │   ├── user_management.py       # User/role configuration
+│   │   │   ├── tax_settings.py          # GST/tax configuration
+│   │   │   ├── payment_settings.py      # Payment method setup
+│   │   │   └── system_settings.py       # General system settings
+│   │   │
+│   │   └── components/                  # Reusable UI components
+│   │       ├── __init__.py
+│   │       ├── search_widget.py         # Universal search component
+│   │       ├── data_table.py            # Enhanced table widget
+│   │       ├── date_picker.py           # Date selection widget
+│   │       ├── number_pad.py            # Numeric input pad
+│   │       └── loading_overlay.py       # Loading indicator
+│   │
+│   ├── integration/                     # External integrations
+│   │   ├── __init__.py
+│   │   ├── payment_gateways/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_gateway.py          # Abstract payment gateway
+│   │   │   ├── stripe_gateway.py        # Stripe integration
+│   │   │   ├── nets_gateway.py          # NETS integration
+│   │   │   └── paynow_gateway.py        # PayNow integration
+│   │   │
+│   │   ├── accounting_sync/
+│   │   │   ├── __init__.py
+│   │   │   ├── quickbooks_sync.py       # QuickBooks integration
+│   │   │   └── xero_sync.py             # Xero integration
+│   │   │
+│   │   └── hardware/
+│   │       ├── __init__.py
+│   │       ├── printer_manager.py       # Receipt printer interface
+│   │       ├── cash_drawer.py           # Cash drawer control
+│   │       ├── barcode_scanner.py       # Scanner integration
+│   │       └── customer_display.py      # Customer display driver
+│   │
+│   └── utils/                           # Utility modules
+│       ├── __init__.py
+│       ├── async_utils.py               # Async helper functions
+│       ├── validators.py                # Data validation utilities
+│       ├── formatters.py                # Number/date formatting
+│       ├── security.py                  # Security utilities
+│       ├── backup.py                    # Database backup utilities
+│       └── logger.py                    # Logging configuration
+│
+├── tests/                               # Test suite
+│   ├── __init__.py
+│   ├── conftest.py                      # Pytest configuration
+│   ├── fixtures/                        # Test fixtures
+│   │   ├── __init__.py
+│   │   ├── database.py                  # Database fixtures
+│   │   ├── models.py                    # Model fixtures
+│   │   └── ui.py                        # UI test fixtures
+│   │
+│   ├── unit/                            # Unit tests
+│   │   ├── __init__.py
+│   │   ├── test_models/
+│   │   ├── test_services/
+│   │   ├── test_managers/
+│   │   └── test_utils/
+│   │
+│   ├── integration/                     # Integration tests
+│   │   ├── __init__.py
+│   │   ├── test_payment_flow.py
+│   │   ├── test_inventory_sync.py
+│   │   └── test_reporting.py
+│   │
+│   └── e2e/                            # End-to-end tests
+│       ├── __init__.py
+│       ├── test_pos_workflow.py
+│       └── test_full_transaction.py
+│
+├── scripts/                             # Utility scripts
+│   ├── __init__.py
+│   ├── init_db.py                       # Database initialization
+│   ├── migrate_db.py                    # Database migrations
+│   ├── seed_data.py                     # Development data seeding
+│   ├── backup_db.py                     # Database backup script
+│   └── generate_reports.py              # Batch report generation
+│
+├── resources/                           # Application resources
+│   ├── images/                          # UI images and icons
+│   ├── fonts/                           # Custom fonts
+│   ├── templates/                       # Report templates
+│   │   ├── receipt.html
+│   │   ├── invoice.html
+│   │   └── reports/
+│   └── translations/                    # i18n files
+│       ├── en_US.json
+│       ├── zh_CN.json
+│       └── ms_MY.json
+│
+├── docs/                                # Documentation
+│   ├── api/                             # API documentation
+│   ├── user_guide/                      # User manual
+│   ├── admin_guide/                     # Administrator guide
+│   └── developer_guide/                 # Developer documentation
+│
+├── deployment/                          # Deployment configurations
+│   ├── docker/
+│   │   ├── Dockerfile
+│   │   └── docker-compose.yml
+│   ├── kubernetes/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   └── installer/
+│       ├── windows/
+│       ├── macos/
+│       └── linux/
+│
+├── .github/                             # GitHub configurations
+│   ├── workflows/
+│   │   ├── ci.yml                       # Continuous integration
+│   │   ├── release.yml                  # Release automation
+│   │   └── codeql.yml                   # Security scanning
+│   └── ISSUE_TEMPLATE/
+│
+├── requirements/                        # Dependency specifications
+│   ├── base.txt                         # Core dependencies
+│   ├── dev.txt                          # Development dependencies
+│   └── prod.txt                         # Production dependencies
+│
+├── .env.example                         # Environment variables template
+├── .gitignore                           # Git ignore rules
+├── .pre-commit-config.yaml              # Pre-commit hooks
+├── pyproject.toml                       # Project configuration
+├── README.md                            # Project documentation
+├── LICENSE                              # License file
+└── setup.py                             # Package setup
+```
+
+## Application Modules and User Interaction
+
+### System Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Presentation Layer"
+        UI[PySide6 UI Components]
+        MW[Main Window]
+        POS[POS Widget]
+        INV[Inventory Widget]
+        CUST[Customer Widget]
+        REP[Reports Widget]
+        SET[Settings Widget]
+    end
+    
+    subgraph "Business Logic Layer"
+        AC[Application Core]
+        CM[Customer Manager]
+        IM[Inventory Manager]
+        SM[Sales Manager]
+        PM[Payment Manager]
+        GM[GST Manager]
+        RM[Report Manager]
+    end
+    
+    subgraph "Data Access Layer"
+        CS[Customer Service]
+        PS[Product Service]
+        IS[Inventory Service]
+        SS[Sales Service]
+        PAS[Payment Service]
+        US[User Service]
+    end
+    
+    subgraph "Persistence Layer"
+        DB[(PostgreSQL Database)]
+        CACHE[(Redis Cache)]
+    end
+    
+    subgraph "External Systems"
+        PG[Payment Gateways]
+        ACC[Accounting Systems]
+        HW[Hardware Devices]
+    end
+    
+    UI --> AC
+    MW --> POS
+    MW --> INV
+    MW --> CUST
+    MW --> REP
+    MW --> SET
+    
+    AC --> CM
+    AC --> IM
+    AC --> SM
+    AC --> PM
+    AC --> GM
+    AC --> RM
+    
+    CM --> CS
+    IM --> PS
+    IM --> IS
+    SM --> SS
+    PM --> PAS
+    
+    CS --> DB
+    PS --> DB
+    IS --> DB
+    SS --> DB
+    PAS --> DB
+    US --> DB
+    
+    PM --> PG
+    RM --> ACC
+    POS --> HW
+```
+
+### User Interaction Flow
+
+#### 1. Point of Sale Transaction Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Cashier
+    participant UI as POS UI
+    participant SM as Sales Manager
+    participant IM as Inventory Manager
+    participant PM as Payment Manager
+    participant DB as Database
+    
+    C->>UI: Scan/Select Product
+    UI->>SM: Add to Cart
+    SM->>IM: Check Availability
+    IM->>DB: Query Stock
+    DB-->>IM: Stock Level
+    IM-->>SM: Availability Status
+    SM-->>UI: Update Cart Display
+    
+    C->>UI: Process Payment
+    UI->>PM: Initialize Payment
+    PM->>PM: Calculate Total
+    PM->>PM: Apply Discounts
+    PM->>PM: Calculate GST
+    PM-->>UI: Payment Summary
+    
+    C->>UI: Select Payment Method
+    UI->>PM: Process Payment
+    PM->>PG: Process Transaction
+    PG-->>PM: Payment Result
+    PM->>DB: Save Transaction
+    PM->>IM: Update Inventory
+    PM-->>UI: Transaction Complete
+    UI-->>C: Print Receipt
+```
+
+#### 2. Inventory Management Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> ProductList
+    ProductList --> AddProduct: Click Add
+    ProductList --> EditProduct: Select Product
+    ProductList --> StockAdjustment: Adjust Stock
+    
+    AddProduct --> ProductForm
+    EditProduct --> ProductForm
+    ProductForm --> Validation
+    Validation --> SaveProduct: Valid
+    Validation --> ProductForm: Invalid
+    SaveProduct --> ProductList
+    
+    StockAdjustment --> AdjustmentForm
+    AdjustmentForm --> ConfirmAdjustment
+    ConfirmAdjustment --> UpdateInventory
+    UpdateInventory --> ProductList
+    
+    ProductList --> StockTransfer: Transfer Stock
+    StockTransfer --> TransferForm
+    TransferForm --> ConfirmTransfer
+    ConfirmTransfer --> UpdateLocations
+    UpdateLocations --> ProductList
+```
+
+## Key Application Modules Description
+
+### 1. Application Core (`app/application_core.py`)
+
+The ApplicationCore serves as the central dependency injection container and application lifecycle manager. It implements lazy initialization for all managers and services, ensuring efficient resource usage.
+
+```python
+class ApplicationCore:
+    """Central application container managing all dependencies and services."""
+    
+    def __init__(self, config: Config):
+        self._config = config
+        self._db_engine = None
+        self._session_factory = None
+        self._event_bus = EventBus()
+        self._cache = None
+        self._logger = self._setup_logging()
+        
+    @property
+    def customer_manager(self) -> CustomerManager:
+        """Lazy initialization of CustomerManager."""
+        if not hasattr(self, '_customer_manager'):
+            self._customer_manager = CustomerManager(self)
+        return self._customer_manager
+    
+    @property
+    def inventory_manager(self) -> InventoryManager:
+        """Lazy initialization of InventoryManager."""
+        if not hasattr(self, '_inventory_manager'):
+            self._inventory_manager = InventoryManager(self)
+        return self._inventory_manager
+    
+    @property
+    def sales_manager(self) -> SalesManager:
+        """Lazy initialization of SalesManager."""
+        if not hasattr(self, '_sales_manager'):
+            self._sales_manager = SalesManager(self)
+        return self._sales_manager
+    
+    async def initialize(self):
+        """Initialize core application components."""
+        await self._init_database()
+        await self._init_cache()
+        await self._load_configuration()
+        
+    async def shutdown(self):
+        """Graceful shutdown of application components."""
+        await self._close_database()
+        await self._close_cache()
+```
+
+### 2. Sales Manager (`app/business_logic/sales_manager.py`)
+
+The SalesManager orchestrates the entire sales process, coordinating between inventory, payment, and customer management systems.
+
+```python
+class SalesManager:
+    """Manages sales transactions and related business logic."""
+    
+    def __init__(self, app_core: ApplicationCore):
+        self._app_core = app_core
+        self._active_transactions: Dict[str, SalesTransaction] = {}
+        
+    async def create_transaction(self, user_id: int, location_id: int) -> Result[SalesTransactionDTO]:
+        """Create a new sales transaction."""
+        try:
+            # Generate unique transaction number
+            transaction_number = self._generate_transaction_number()
+            
+            # Create transaction object
+            transaction = SalesTransaction(
+                transaction_number=transaction_number,
+                user_id=user_id,
+                location_id=location_id,
+                items=[],
+                status=TransactionStatus.DRAFT
+            )
+            
+            # Store in active transactions
+            self._active_transactions[transaction_number] = transaction
+            
+            # Convert to DTO
+            dto = self._to_dto(transaction)
+            
+            return Result(success=True, data=dto)
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Failed to create transaction: {e}")
+            return Result(success
