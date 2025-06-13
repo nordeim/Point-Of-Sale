@@ -1,0 +1,1 @@
+that is an awesome design! but I think you can create an even better design than this, right? please think more deeply and explore more thoroughly on the various implementation options, but choosing the most impressive and absolute best, beating all existing POS system design out there. Please try again with your absolute very best effort! thank you and good luck!
