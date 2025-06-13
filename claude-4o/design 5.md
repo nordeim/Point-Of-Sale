@@ -2174,4 +2174,16 @@ class ReportManager:
    #!/bin/bash
    BACKUP_DIR="/backup/sgpos"
    DATE=$(
-   
+
+7.2.3 Inventory Widget Module
+Interface for managing products and stock levels.
+
+Key Features:
+
+Product list with filtering
+Bulk operations
+Stock adjustment interface
+Category management
+Import/export functionality
+7.2.4 Reports Widget Module
+
