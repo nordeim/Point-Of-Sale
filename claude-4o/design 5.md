@@ -487,3 +487,369 @@ CREATE TABLE inventory_movements (
     id SERIAL PRIMARY KEY,
     product_id INTEGER NOT NULL,
     variant_id INTEGER
+```sql
+-- Inventory movements (continued)
+CREATE TABLE inventory_movements (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    location_id INTEGER NOT NULL,
+    movement_type VARCHAR(20) NOT NULL, -- PURCHASE, SALE, RETURN, ADJUSTMENT, TRANSFER
+    quantity INTEGER NOT NULL,
+    reference_type VARCHAR(50),
+    reference_id INTEGER,
+    cost_price DECIMAL(15,2),
+    notes TEXT,
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id),
+    FOREIGN KEY (location_id) REFERENCES locations(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Store locations
+CREATE TABLE locations (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(20) DEFAULT 'STORE', -- STORE, WAREHOUSE
+    address TEXT,
+    phone VARCHAR(20),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### 5. Sales and Transaction Tables
+
+```sql
+-- Sales transactions
+CREATE TABLE sales_transactions (
+    id SERIAL PRIMARY KEY,
+    transaction_number VARCHAR(50) UNIQUE NOT NULL,
+    location_id INTEGER NOT NULL,
+    customer_id INTEGER,
+    transaction_date TIMESTAMP NOT NULL,
+    subtotal DECIMAL(15,2) NOT NULL,
+    tax_amount DECIMAL(15,2) NOT NULL,
+    discount_amount DECIMAL(15,2) DEFAULT 0,
+    total_amount DECIMAL(15,2) NOT NULL,
+    paid_amount DECIMAL(15,2) DEFAULT 0,
+    change_amount DECIMAL(15,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'COMPLETED', -- DRAFT, COMPLETED, VOID, REFUNDED
+    notes TEXT,
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (location_id) REFERENCES locations(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Sales transaction items
+CREATE TABLE sales_items (
+    id SERIAL PRIMARY KEY,
+    transaction_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    quantity INTEGER NOT NULL,
+    unit_price DECIMAL(15,2) NOT NULL,
+    discount_amount DECIMAL(15,2) DEFAULT 0,
+    tax_amount DECIMAL(15,2) NOT NULL,
+    total_amount DECIMAL(15,2) NOT NULL,
+    cost_price DECIMAL(15,2) NOT NULL, -- For profit calculation
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES sales_transactions(id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id)
+);
+
+-- Payment records
+CREATE TABLE payments (
+    id SERIAL PRIMARY KEY,
+    transaction_id INTEGER NOT NULL,
+    payment_method VARCHAR(50) NOT NULL, -- CASH, CREDIT_CARD, DEBIT_CARD, NETS, PAYNOW, etc.
+    amount DECIMAL(15,2) NOT NULL,
+    currency_code VARCHAR(3) DEFAULT 'SGD',
+    exchange_rate DECIMAL(10,6) DEFAULT 1.0,
+    reference_number VARCHAR(100), -- For card/online payments
+    status VARCHAR(20) DEFAULT 'COMPLETED', -- PENDING, COMPLETED, FAILED, REFUNDED
+    processed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES sales_transactions(id)
+);
+
+-- Cash drawer sessions
+CREATE TABLE cash_sessions (
+    id SERIAL PRIMARY KEY,
+    location_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    opening_amount DECIMAL(15,2) NOT NULL,
+    closing_amount DECIMAL(15,2),
+    expected_amount DECIMAL(15,2),
+    difference_amount DECIMAL(15,2),
+    status VARCHAR(20) DEFAULT 'OPEN', -- OPEN, CLOSED
+    opened_at TIMESTAMP NOT NULL,
+    closed_at TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (location_id) REFERENCES locations(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+#### 6. Supplier and Purchase Tables
+
+```sql
+-- Supplier information
+CREATE TABLE suppliers (
+    id SERIAL PRIMARY KEY,
+    supplier_code VARCHAR(20) UNIQUE NOT NULL,
+    company_name VARCHAR(255) NOT NULL,
+    contact_person VARCHAR(100),
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    address TEXT,
+    payment_terms INTEGER DEFAULT 30, -- Days
+    tax_id VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Purchase orders
+CREATE TABLE purchase_orders (
+    id SERIAL PRIMARY KEY,
+    po_number VARCHAR(50) UNIQUE NOT NULL,
+    supplier_id INTEGER NOT NULL,
+    order_date DATE NOT NULL,
+    expected_date DATE,
+    subtotal DECIMAL(15,2) NOT NULL,
+    tax_amount DECIMAL(15,2) NOT NULL,
+    total_amount DECIMAL(15,2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, SENT, PARTIAL, RECEIVED, CANCELLED
+    notes TEXT,
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Purchase order items
+CREATE TABLE purchase_order_items (
+    id SERIAL PRIMARY KEY,
+    po_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    quantity INTEGER NOT NULL,
+    unit_price DECIMAL(15,2) NOT NULL,
+    tax_amount DECIMAL(15,2) NOT NULL,
+    total_amount DECIMAL(15,2) NOT NULL,
+    received_quantity INTEGER DEFAULT 0,
+    FOREIGN KEY (po_id) REFERENCES purchase_orders(id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (variant_id) REFERENCES product_variants(id)
+);
+```
+
+#### 7. Accounting Tables
+
+```sql
+-- Chart of accounts
+CREATE TABLE accounts (
+    id SERIAL PRIMARY KEY,
+    account_code VARCHAR(20) UNIQUE NOT NULL,
+    account_name VARCHAR(100) NOT NULL,
+    account_type VARCHAR(20) NOT NULL, -- ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+    parent_id INTEGER,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES accounts(id)
+);
+
+-- Journal entries
+CREATE TABLE journal_entries (
+    id SERIAL PRIMARY KEY,
+    entry_number VARCHAR(50) UNIQUE NOT NULL,
+    entry_date DATE NOT NULL,
+    description TEXT,
+    reference_type VARCHAR(50),
+    reference_id INTEGER,
+    status VARCHAR(20) DEFAULT 'POSTED', -- DRAFT, POSTED, VOID
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Journal entry lines
+CREATE TABLE journal_lines (
+    id SERIAL PRIMARY KEY,
+    entry_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    debit_amount DECIMAL(15,2) DEFAULT 0,
+    credit_amount DECIMAL(15,2) DEFAULT 0,
+    description TEXT,
+    FOREIGN KEY (entry_id) REFERENCES journal_entries(id),
+    FOREIGN KEY (account_id) REFERENCES accounts(id),
+    CHECK (debit_amount >= 0 AND credit_amount >= 0),
+    CHECK (NOT (debit_amount > 0 AND credit_amount > 0))
+);
+```
+
+#### 8. GST and Tax Tables
+
+```sql
+-- GST configuration
+CREATE TABLE gst_config (
+    id SERIAL PRIMARY KEY,
+    effective_date DATE NOT NULL,
+    standard_rate DECIMAL(5,2) NOT NULL,
+    zero_rated_categories JSONB, -- Array of category IDs
+    exempt_categories JSONB, -- Array of category IDs
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- GST returns
+CREATE TABLE gst_returns (
+    id SERIAL PRIMARY KEY,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    box1_total_sales DECIMAL(15,2) NOT NULL, -- Total value of standard-rated supplies
+    box2_total_purchases DECIMAL(15,2) NOT NULL, -- Total value of purchases
+    box3_output_tax DECIMAL(15,2) NOT NULL, -- Output tax due
+    box4_input_tax DECIMAL(15,2) NOT NULL, -- Input tax claimable
+    box5_net_tax DECIMAL(15,2) NOT NULL, -- Net GST to be paid/claimed
+    box6_total_exports DECIMAL(15,2) DEFAULT 0, -- Value of exports
+    box7_total_exempt DECIMAL(15,2) DEFAULT 0, -- Value of exempt supplies
+    status VARCHAR(20) DEFAULT 'DRAFT', -- DRAFT, SUBMITTED, ACCEPTED
+    submission_date DATE,
+    reference_number VARCHAR(50),
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+```
+
+### Database Indexes and Constraints
+
+```sql
+-- Performance indexes
+CREATE INDEX idx_customers_email ON customers(email);
+CREATE INDEX idx_customers_phone ON customers(phone);
+CREATE INDEX idx_products_sku ON products(sku);
+CREATE INDEX idx_products_barcode ON products(barcode);
+CREATE INDEX idx_sales_date ON sales_transactions(transaction_date);
+CREATE INDEX idx_sales_customer ON sales_transactions(customer_id);
+CREATE INDEX idx_inventory_product ON inventory(product_id);
+CREATE INDEX idx_audit_table_record ON audit_log(table_name, record_id);
+
+-- Triggers for automatic timestamp updates
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger for audit logging
+CREATE OR REPLACE FUNCTION audit_trigger_function()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO audit_log(table_name, record_id, action, user_id, changes)
+        VALUES (TG_TABLE_NAME, NEW.id, TG_OP, current_setting('app.current_user_id')::INTEGER, row_to_json(NEW));
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO audit_log(table_name, record_id, action, user_id, changes)
+        VALUES (TG_TABLE_NAME, NEW.id, TG_OP, current_setting('app.current_user_id')::INTEGER, 
+                jsonb_build_object('old', row_to_json(OLD), 'new', row_to_json(NEW)));
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO audit_log(table_name, record_id, action, user_id, changes)
+        VALUES (TG_TABLE_NAME, OLD.id, TG_OP, current_setting('app.current_user_id')::INTEGER, row_to_json(OLD));
+    END IF;
+    RETURN NULL;
+END;
+$$ language 'plpgsql';
+
+-- Apply audit triggers to critical tables
+CREATE TRIGGER audit_customers AFTER INSERT OR UPDATE OR DELETE ON customers
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+    
+CREATE TRIGGER audit_sales AFTER INSERT OR UPDATE OR DELETE ON sales_transactions
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+```
+
+## Codebase File Hierarchy
+
+```
+sg-pos-system/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                          # Application entry point
+│   ├── config.py                        # Configuration management
+│   ├── constants.py                     # Application constants
+│   ├── exceptions.py                    # Custom exceptions
+│   ├── application_core.py              # Dependency injection container
+│   │
+│   ├── models/                          # SQLAlchemy ORM models
+│   │   ├── __init__.py
+│   │   ├── base.py                      # Base model class
+│   │   ├── user.py                      # User and authentication models
+│   │   ├── customer.py                  # Customer models
+│   │   ├── product.py                   # Product and inventory models
+│   │   ├── sales.py                     # Sales transaction models
+│   │   ├── supplier.py                  # Supplier and purchase models
+│   │   ├── accounting.py                # Accounting models
+│   │   └── gst.py                       # GST and tax models
+│   │
+│   ├── dto/                             # Data Transfer Objects
+│   │   ├── __init__.py
+│   │   ├── base.py                      # Base DTO and Result classes
+│   │   ├── customer_dto.py              # Customer DTOs
+│   │   ├── product_dto.py               # Product DTOs
+│   │   ├── sales_dto.py                 # Sales DTOs
+│   │   ├── payment_dto.py               # Payment DTOs
+│   │   └── report_dto.py                # Reporting DTOs
+│   │
+│   ├── services/                        # Data access layer
+│   │   ├── __init__.py
+│   │   ├── base_service.py              # Base service class
+│   │   ├── customer_service.py          # Customer data operations
+│   │   ├── product_service.py           # Product data operations
+│   │   ├── inventory_service.py         # Inventory operations
+│   │   ├── sales_service.py             # Sales data operations
+│   │   ├── payment_service.py           # Payment processing
+│   │   ├── supplier_service.py          # Supplier operations
+│   │   ├── user_service.py              # User management
+│   │   └── configuration_service.py     # System configuration
+│   │
+│   ├── business_logic/                  # Business logic layer
+│   │   ├── __init__.py
+│   │   ├── customer_manager.py          # Customer business logic
+│   │   ├── inventory_manager.py         # Inventory management
+│   │   ├── sales_manager.py             # Sales processing
+│   │   ├── payment_manager.py           # Payment handling
+│   │   ├── promotion_manager.py         # Promotions and discounts
+│   │   ├── loyalty_manager.py           # Loyalty program
+│   │   └── report_manager.py            # Report generation
+│   │
+│   ├── accounting/                      # Accounting module
+│   │   ├── __init__.py
+│   │   ├── gst_manager.py               # GST calculations
+│   │   ├── journal_manager.py           # Journal entries
+│   │   ├── ledger_manager.py            # General ledger
+│   │   └── financial_reports.py         # Financial reporting
+│   │
+│   ├── ui/                              # Presentation layer
+│   │   ├── __init__.py
+│   │   ├── main_window.py               # Main application window
+│   │
