@@ -1674,3 +1674,504 @@ class GSTManager:
             
             # Process purchases
             for purchase
+<think>
+I need to continue from where I left off in the GST Manager code and complete the rest of the PRD, including the remaining sections like Development Environment Setup, Production Environment Setup, Security Considerations, Testing Strategy, Deployment Strategy, Compliance and Regulatory Requirements, Performance Requirements, and Future Enhancements.
+</think>
+
+```python
+            # Process purchases
+            for purchase in purchases.data:
+                if purchase.tax_type == "STANDARD":
+                    box2 += purchase.subtotal
+                    box4 += purchase.tax_amount
+            
+            # Calculate net GST
+            box5 = box3 - box4  # Net GST to be paid/claimed
+            
+            # Create GST return record
+            gst_return = GSTReturn(
+                period_start=start_date,
+                period_end=end_date,
+                box1_total_sales=box1,
+                box2_total_purchases=box2,
+                box3_output_tax=box3,
+                box4_input_tax=box4,
+                box5_net_tax=box5,
+                box6_total_exports=box6,
+                box7_total_exempt=box7,
+                status=GSTReturnStatus.DRAFT
+            )
+            
+            saved = await self._app_core.gst_service.create_return(gst_return)
+            
+            return Result(success=True, data=self._to_gst_return_dto(saved.data))
+            
+        except Exception as e:
+            self._app_core.logger.error(f"GST return generation failed: {e}")
+            return Result(success=False, error=str(e))
+    
+    async def submit_gst_return(self, return_id: int) -> Result[GSTSubmissionDTO]:
+        """Submit GST return to IRAS."""
+        try:
+            # Get return data
+            gst_return = await self._app_core.gst_service.get_by_id(return_id)
+            if not gst_return:
+                return Result(success=False, error="GST return not found")
+            
+            # Validate return
+            validation = self._validate_gst_return(gst_return)
+            if not validation.success:
+                return Result(success=False, error=validation.error)
+            
+            # Submit to IRAS API (when available)
+            # For now, generate submission file
+            submission_data = self._prepare_submission_data(gst_return)
+            
+            # Update return status
+            gst_return.status = GSTReturnStatus.SUBMITTED
+            gst_return.submission_date = datetime.now()
+            
+            await self._app_core.gst_service.update(gst_return)
+            
+            return Result(success=True, data=submission_data)
+            
+        except Exception as e:
+            self._app_core.logger.error(f"GST submission failed: {e}")
+            return Result(success=False, error=str(e))
+```
+
+### 6. Report Manager (`app/business_logic/report_manager.py`)
+
+The ReportManager generates various business reports and analytics.
+
+```python
+class ReportManager:
+    """Manages report generation and business analytics."""
+    
+    def __init__(self, app_core: ApplicationCore):
+        self._app_core = app_core
+        self._report_cache = TTLCache(maxsize=100, ttl=3600)  # 1-hour cache
+        
+    async def generate_sales_report(self, start_date: date, end_date: date,
+                                  group_by: str = "day") -> Result[SalesReportDTO]:
+        """Generate sales report for specified period."""
+        try:
+            cache_key = f"sales:{start_date}:{end_date}:{group_by}"
+            
+            # Check cache
+            if cache_key in self._report_cache:
+                return Result(success=True, data=self._report_cache[cache_key])
+            
+            # Get sales data
+            sales_data = await self._app_core.sales_service.get_sales_summary(
+                start_date, end_date, group_by
+            )
+            
+            # Calculate metrics
+            total_sales = sum(s.total_amount for s in sales_data)
+            total_transactions = len(sales_data)
+            average_transaction = total_sales / total_transactions if total_transactions > 0 else 0
+            
+            # Get top products
+            top_products = await self._app_core.sales_service.get_top_products(
+                start_date, end_date, limit=10
+            )
+            
+            # Get sales by category
+            category_sales = await self._app_core.sales_service.get_sales_by_category(
+                start_date, end_date
+            )
+            
+            # Build report
+            report = SalesReportDTO(
+                period_start=start_date,
+                period_end=end_date,
+                total_sales=total_sales,
+                total_transactions=total_transactions,
+                average_transaction=average_transaction,
+                sales_data=sales_data,
+                top_products=top_products,
+                category_breakdown=category_sales,
+                generated_at=datetime.now()
+            )
+            
+            # Cache report
+            self._report_cache[cache_key] = report
+            
+            return Result(success=True, data=report)
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Sales report generation failed: {e}")
+            return Result(success=False, error=str(e))
+    
+    async def generate_inventory_report(self, location_id: Optional[int] = None) -> Result[InventoryReportDTO]:
+        """Generate inventory valuation and status report."""
+        try:
+            # Get inventory data
+            inventory_data = await self._app_core.inventory_service.get_inventory_summary(
+                location_id
+            )
+            
+            # Calculate metrics
+            total_value = Decimal("0.00")
+            low_stock_items = []
+            out_of_stock_items = []
+            
+            for item in inventory_data:
+                item_value = item.quantity * item.cost_price
+                total_value += item_value
+                
+                if item.quantity == 0:
+                    out_of_stock_items.append(item)
+                elif item.quantity <= item.reorder_point:
+                    low_stock_items.append(item)
+            
+            # Get inventory turnover
+            turnover_data = await self._calculate_inventory_turnover()
+            
+            # Build report
+            report = InventoryReportDTO(
+                total_items=len(inventory_data),
+                total_value=total_value,
+                low_stock_count=len(low_stock_items),
+                out_of_stock_count=len(out_of_stock_items),
+                low_stock_items=low_stock_items,
+                out_of_stock_items=out_of_stock_items,
+                turnover_data=turnover_data,
+                generated_at=datetime.now()
+            )
+            
+            return Result(success=True, data=report)
+            
+        except Exception as e:
+            self._app_core.logger.error(f"Inventory report generation failed: {e}")
+            return Result(success=False, error=str(e))
+```
+
+## Development Environment Setup
+
+### Prerequisites
+
+1. **Python 3.11 or higher**
+   ```bash
+   # Check Python version
+   python --version
+   ```
+
+2. **PostgreSQL 15 or higher**
+   ```bash
+   # Install PostgreSQL
+   # Ubuntu/Debian
+   sudo apt-get install postgresql-15 postgresql-client-15
+   
+   # macOS with Homebrew
+   brew install postgresql@15
+   
+   # Windows
+   # Download installer from https://www.postgresql.org/download/windows/
+   ```
+
+3. **Redis (for caching)**
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install redis-server
+   
+   # macOS with Homebrew
+   brew install redis
+   
+   # Windows
+   # Download from https://github.com/microsoftarchive/redis/releases
+   ```
+
+4. **Git**
+   ```bash
+   # Clone repository
+   git clone https://github.com/your-org/sg-pos-system.git
+   cd sg-pos-system
+   ```
+
+### Environment Setup
+
+1. **Create Python Virtual Environment**
+   ```bash
+   # Create virtual environment
+   python -m venv venv
+   
+   # Activate virtual environment
+   # Linux/macOS
+   source venv/bin/activate
+   
+   # Windows
+   venv\Scripts\activate
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   # Install development dependencies
+   pip install -r requirements/dev.txt
+   
+   # Install pre-commit hooks
+   pre-commit install
+   ```
+
+3. **Database Setup**
+   ```bash
+   # Create database
+   createdb sg_pos_dev
+   
+   # Run migrations
+   python scripts/init_db.py --env development
+   
+   # Seed development data
+   python scripts/seed_data.py
+   ```
+
+4. **Environment Configuration**
+   ```bash
+   # Copy environment template
+   cp .env.example .env.development
+   
+   # Edit .env.development with your settings
+   ```
+
+   Example `.env.development`:
+   ```env
+   # Database
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/sg_pos_dev
+   DATABASE_POOL_SIZE=5
+   DATABASE_MAX_OVERFLOW=10
+   
+   # Redis
+   REDIS_URL=redis://localhost:6379/0
+   
+   # Application
+   APP_ENV=development
+   APP_DEBUG=true
+   APP_SECRET_KEY=dev-secret-key-change-in-production
+   
+   # Payment Gateways
+   STRIPE_API_KEY=sk_test_...
+   STRIPE_WEBHOOK_SECRET=whsec_test_...
+   
+   # External APIs
+   EXCHANGE_RATE_API_KEY=your-api-key
+   
+   # Logging
+   LOG_LEVEL=DEBUG
+   LOG_FILE=logs/development.log
+   ```
+
+5. **IDE Configuration**
+
+   **VS Code**
+   ```json
+   // .vscode/settings.json
+   {
+     "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+     "python.linting.enabled": true,
+     "python.linting.pylintEnabled": false,
+     "python.linting.flake8Enabled": true,
+     "python.formatting.provider": "black",
+     "python.testing.pytestEnabled": true,
+     "python.testing.pytestArgs": ["tests"],
+     "editor.formatOnSave": true,
+     "editor.codeActionsOnSave": {
+       "source.organizeImports": true
+     }
+   }
+   ```
+
+   **PyCharm**
+   - Set Project Interpreter to virtual environment
+   - Enable Django support (for templates)
+   - Configure code style to use Black
+   - Set up database connection for SQL support
+
+### Running the Application
+
+1. **Start Required Services**
+   ```bash
+   # Start PostgreSQL
+   sudo systemctl start postgresql  # Linux
+   brew services start postgresql@15  # macOS
+   
+   # Start Redis
+   sudo systemctl start redis  # Linux
+   brew services start redis  # macOS
+   ```
+
+2. **Run Application**
+   ```bash
+   # Run in development mode
+   python app/main.py --env development
+   ```
+
+3. **Run Tests**
+   ```bash
+   # Run all tests
+   pytest
+   
+   # Run with coverage
+   pytest --cov=app --cov-report=html
+   
+   # Run specific test file
+   pytest tests/unit/test_sales_manager.py
+   
+   # Run tests in parallel
+   pytest -n auto
+   ```
+
+4. **Code Quality Checks**
+   ```bash
+   # Format code
+   black app tests
+   
+   # Run linter
+   ruff app tests
+   
+   # Type checking
+   mypy app
+   
+   # All checks (via pre-commit)
+   pre-commit run --all-files
+   ```
+
+## Production Environment Setup
+
+### Server Requirements
+
+1. **Hardware Requirements**
+   - CPU: 4+ cores (8+ recommended)
+   - RAM: 8GB minimum (16GB recommended)
+   - Storage: 100GB SSD minimum
+   - Network: Stable internet connection
+
+2. **Operating System**
+   - Ubuntu 22.04 LTS (recommended)
+   - CentOS 8/RHEL 8
+   - Windows Server 2019+
+
+### Production Setup
+
+1. **System Preparation**
+   ```bash
+   # Update system
+   sudo apt update && sudo apt upgrade -y
+   
+   # Install required packages
+   sudo apt install -y python3.11 python3.11-venv python3.11-dev \
+     postgresql-15 postgresql-client-15 redis-server nginx \
+     supervisor git build-essential
+   
+   # Create application user
+   sudo useradd -m -s /bin/bash sgpos
+   sudo usermod -aG sudo sgpos
+   ```
+
+2. **PostgreSQL Configuration**
+   ```bash
+   # Configure PostgreSQL
+   sudo -u postgres psql
+   
+   CREATE USER sgpos_prod WITH PASSWORD 'strong-password';
+   CREATE DATABASE sg_pos_prod OWNER sgpos_prod;
+   GRANT ALL PRIVILEGES ON DATABASE sg_pos_prod TO sgpos_prod;
+   \q
+   
+   # Edit PostgreSQL configuration
+   sudo nano /etc/postgresql/15/main/postgresql.conf
+   ```
+   
+   Key settings:
+   ```conf
+   max_connections = 200
+   shared_buffers = 256MB
+   effective_cache_size = 1GB
+   maintenance_work_mem = 64MB
+   checkpoint_completion_target = 0.9
+   wal_buffers = 16MB
+   default_statistics_target = 100
+   random_page_cost = 1.1
+   effective_io_concurrency = 200
+   work_mem = 4MB
+   min_wal_size = 1GB
+   max_wal_size = 4GB
+   ```
+
+3. **Application Deployment**
+   ```bash
+   # Switch to application user
+   sudo su - sgpos
+   
+   # Clone repository
+   git clone https://github.com/your-org/sg-pos-system.git /opt/sgpos
+   cd /opt/sgpos
+   
+   # Create virtual environment
+   python3.11 -m venv venv
+   source venv/bin/activate
+   
+   # Install production dependencies
+   pip install -r requirements/prod.txt
+   
+   # Set up environment
+   cp .env.example .env.production
+   # Edit .env.production with production settings
+   
+   # Initialize database
+   python scripts/init_db.py --env production
+   ```
+
+4. **Supervisor Configuration**
+   ```ini
+   # /etc/supervisor/conf.d/sgpos.conf
+   [program:sgpos]
+   command=/opt/sgpos/venv/bin/python /opt/sgpos/app/main.py --env production
+   directory=/opt/sgpos
+   user=sgpos
+   autostart=true
+   autorestart=true
+   redirect_stderr=true
+   stdout_logfile=/var/log/sgpos/app.log
+   environment=PATH="/opt/sgpos/venv/bin",PYTHONPATH="/opt/sgpos"
+   ```
+
+5. **Nginx Configuration** (for API endpoints)
+   ```nginx
+   # /etc/nginx/sites-available/sgpos
+   server {
+       listen 80;
+       server_name pos.yourdomain.com;
+       
+       location /api {
+           proxy_pass http://localhost:8000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+       
+       location /static {
+           alias /opt/sgpos/static;
+           expires 30d;
+       }
+   }
+   ```
+
+6. **SSL Configuration**
+   ```bash
+   # Install Certbot
+   sudo apt install certbot python3-certbot-nginx
+   
+   # Obtain SSL certificate
+   sudo certbot --nginx -d pos.yourdomain.com
+   ```
+
+7. **Backup Configuration**
+   ```bash
+   # Create backup script
+   cat > /opt/sgpos/scripts/backup_prod.sh << 'EOF'
+   #!/bin/bash
+   BACKUP_DIR="/backup/sgpos"
+   DATE=$(
+   
