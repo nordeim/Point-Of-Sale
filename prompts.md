@@ -13,6 +13,9 @@ really awesome README.md! Please help me create the complete database schema for
 awesome job! Please help me create a complete / generate `docker-compose.dev.yml` based on your design. Thank you for your excellent help!
 
 ---
+awesome job! Please help me create a complete / generate `docker-compose.dev.yml` based on your design. also provide a detailed step-by-step guide to deploy a docker container using the compose YML file. please enclose the YML within ```yml and ``` tags, the docker deployment guide within ```md and ``` tags. Thank you for your excellent help!
+
+---
 wow, that is an awesome docker compose YML! You are the best absolute best designer and coder! Please also help me to create a complete `pyproject.toml`.
 
 ---
