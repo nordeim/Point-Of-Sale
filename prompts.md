@@ -2,3 +2,6 @@ that is an awesome design! but I think you can create an even better design than
 
 ---
 that is really awesome! I like it. Can you create an equally awesome GitHub repository `README.md` for this project with at least 4000 words. Hopefully, your awesome README.md will attract widespread developer interests to this project!
+
+---
+That is an awesome design! Please help me create an equally awesome `README.md` for the GitHub repository for this project. Use at least 4000 words to be as detailed as possible. Hopefully it will be able to attract as many developers to this project as possible.
