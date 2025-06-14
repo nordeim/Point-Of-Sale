@@ -10,6 +10,9 @@ That is an awesome design! Please help me create an equally awesome `README.md` 
 really awesome README.md! Please help me create the complete database schema for your design. Thank you!
 
 ---
+please confirm that you have provided the *complete* tested sql script to create the correct and working database schema based on your "super-set" design. If yes, please also create a step by step guide to deploy the postgresql database with the given schema. create a detailed `deployment_guide for_postgresql_database.md`. 
+
+---
 awesome job! Please help me create a complete / generate `docker-compose.dev.yml` based on your design. Thank you for your excellent help!
 
 ---
