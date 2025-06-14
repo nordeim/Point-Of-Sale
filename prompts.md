@@ -8,3 +8,7 @@ That is an awesome design! Please help me create an equally awesome `README.md` 
 
 ---
 really awesome README.md! Please help me create the complete database schema for your design. Thank you!
+
+---
+awesome job! Please help me create a complete / generate `docker-compose.dev.yml` based on your design. Thank you for your excellent help!
+
