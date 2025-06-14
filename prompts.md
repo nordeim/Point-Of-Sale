@@ -22,6 +22,9 @@ awesome job! Please help me create a complete / generate `docker-compose.dev.yml
 wow, that is an awesome docker compose YML! You are the best absolute best designer and coder! Please also help me to create a complete `pyproject.toml`.
 
 ---
+wow, you have dome a fantastic job with the database schema creation script and guide. Now, please create  a detailed `Project Architecture Document.md` that includes a complete codebase file hierarchy structure and a list of code files with their description, goals and purpose and a definition of their interfaces for interacting with other modules or functions. Use at least 6000 words for the PAD to make it as clear, logical and a useful and helpful handbook for developers to work collaboratively to work independently on different parts of the codebase. Include a bash script to create the actual codebase file directory structure with respect to the project root folder. Use "mkdir -p " to reduce the number of "mkdir" commands to the minimum.
+
+---
 wow, you have done yet another awesome job! please help me create a complete `app/core.py` within ```python and ``` tags so that I can use it to jump start the whole application development!
 
 ---
