@@ -5,3 +5,6 @@ that is really awesome! I like it. Can you create an equally awesome GitHub repo
 
 ---
 That is an awesome design! Please help me create an equally awesome `README.md` for the GitHub repository for this project. Use at least 4000 words to be as detailed as possible. Hopefully it will be able to attract as many developers to this project as possible.
+
+---
+really awesome README.md! Please help me create the complete database schema for your design. Thank you!
