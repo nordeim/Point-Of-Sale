@@ -14,3 +14,6 @@ awesome job! Please help me create a complete / generate `docker-compose.dev.yml
 
 ---
 wow, that is an awesome docker compose YML! You are the best absolute best designer and coder! Please also help me to create a complete `pyproject.toml`.
+
+---
+wow, you have done yet another awesome job! please help me create a complete `app/core.py` within ```python and ``` tags so that I can use it to jump start the whole application development!
