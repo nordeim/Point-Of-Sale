@@ -17,3 +17,6 @@ wow, that is an awesome docker compose YML! You are the best absolute best desig
 
 ---
 wow, you have done yet another awesome job! please help me create a complete `app/core.py` within ```python and ``` tags so that I can use it to jump start the whole application development!
+
+---
+I have received many design proposals for my project. Since I am not a design or coding expert like you, please help me to carefully evaluate and validate them (attached) one by one, then create a 6000 words research report on your assessment of the submitted designs. Compare and rank each of the designs in your report, rank them in a list starting with the "best" design (please help me to establish a ranking criteria) at the top of the list.
